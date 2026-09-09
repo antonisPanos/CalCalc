@@ -1,4 +1,8 @@
 <resources>
 
-    <style name="Theme.CalCalc" parent="Theme.MaterialComponents.Light" />
+    <style name="Theme.CalCalc" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>
