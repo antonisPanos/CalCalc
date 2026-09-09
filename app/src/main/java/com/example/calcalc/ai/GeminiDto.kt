@@ -75,3 +75,14 @@ data class ParsedItem(
     @Json(name = "fat_g") val fatG: Double? = null,
     val confidence: Double? = null,
 )
+
+/** Google's standard error envelope, used to surface a useful message instead of a code. */
+@JsonClass(generateAdapter = true)
+data class ApiErrorEnvelope(val error: ApiError? = null)
+
+@JsonClass(generateAdapter = true)
+data class ApiError(
+    val code: Int? = null,
+    val message: String? = null,
+    val status: String? = null,
+)

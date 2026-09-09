@@ -29,7 +29,7 @@ Everything is dark mode only.
 | UI | Kotlin + Jetpack Compose, Material 3, Navigation3 |
 | Auth | Firebase Auth via Google Sign-In (Credential Manager) |
 | Storage | Firestore only — its persistent cache is the offline layer, so there is no local DB |
-| AI | Gemini REST (`gemini-2.5-flash`) via Retrofit/Moshi, with a `responseSchema` forcing structured JSON |
+| AI | Gemini REST (`gemini-3.6-flash`) via Retrofit/Moshi, with a `responseSchema` forcing structured JSON |
 | Camera | CameraX in-app capture, plus the system photo picker |
 | API key | Encrypted with an Android Keystore AES-GCM key, stored in DataStore |
 

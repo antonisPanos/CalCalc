@@ -106,6 +106,22 @@ class GeminiRepositoryTest {
     }
 
     @Test
+    fun `a retired model surfaces Google's own explanation`() = runTest {
+        val body = """{"error":{"code":404,"message":"This model models/gemini-2.5-flash is no longer available to new users.","status":"NOT_FOUND"}}"""
+        val result = repo { throw httpError(404, body) }.sendTurn(emptyList(), TurnInput("eggs"))
+
+        val error = result.exceptionOrNull()
+        assertTrue(error is GeminiError.ModelUnavailable)
+        assertTrue(error!!.message!!.contains("no longer available to new users"))
+    }
+
+    @Test
+    fun `a 404 with no readable body still reports the model`() = runTest {
+        val result = repo { throw httpError(404, "") }.sendTurn(emptyList(), TurnInput("eggs"))
+        assertTrue(result.exceptionOrNull() is GeminiError.ModelUnavailable)
+    }
+
+    @Test
     fun `quota exhaustion maps to RateLimited`() = runTest {
         val result = repo { throw httpError(429) }.sendTurn(emptyList(), TurnInput("eggs"))
         assertEquals(GeminiError.RateLimited, result.exceptionOrNull())
@@ -126,7 +142,7 @@ class GeminiRepositoryTest {
         assertTrue(result.exceptionOrNull() is GeminiError.Blocked)
     }
 
-    private fun httpError(code: Int) = HttpException(
-        Response.error<GeminiResponse>(code, "{}".toResponseBody("application/json".toMediaType()))
+    private fun httpError(code: Int, body: String = "{}") = HttpException(
+        Response.error<GeminiResponse>(code, body.toResponseBody("application/json".toMediaType()))
     )
 }

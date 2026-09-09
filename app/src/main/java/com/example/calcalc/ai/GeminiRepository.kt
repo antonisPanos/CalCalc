@@ -19,6 +19,8 @@ data class TurnInput(
 
 /** Failures the chat UI knows how to explain, instead of surfacing a raw exception. */
 sealed class GeminiError(message: String) : Exception(message) {
+    /** The model name is gone or renamed; [message] carries Google's own explanation. */
+    class ModelUnavailable(detail: String) : GeminiError(detail)
     object MissingKey : GeminiError("No Gemini API key set. Add one in Profile.")
     object InvalidKey : GeminiError("That Gemini API key was rejected. Check it in Profile.")
     object RateLimited : GeminiError("Gemini is rate-limiting or out of quota. Try again shortly.")
@@ -92,15 +94,33 @@ class GeminiRepository(
         // IOException, and a garbled model reply is not a connectivity problem.
         this is JsonDataException || this is JsonEncodingException ->
             GeminiError.Unexpected("Couldn't read Gemini's response.")
-        this is HttpException -> when (code()) {
-            400, 401, 403 -> GeminiError.InvalidKey
-            429 -> GeminiError.RateLimited
-            in 500..599 -> GeminiError.Unexpected("Gemini is having trouble (HTTP ${code()}).")
-            else -> GeminiError.Unexpected("Gemini call failed (HTTP ${code()}).")
+        this is HttpException -> {
+            val serverMessage = serverErrorMessage()
+            when (code()) {
+                400, 401, 403 -> GeminiError.InvalidKey
+                404 -> GeminiError.ModelUnavailable(
+                    serverMessage ?: "Gemini model ${MealPrompt.MODEL} is unavailable."
+                )
+                429 -> GeminiError.RateLimited
+                in 500..599 -> GeminiError.Unexpected("Gemini is having trouble (HTTP ${code()}).")
+                else -> GeminiError.Unexpected(
+                    serverMessage ?: "Gemini call failed (HTTP ${code()})."
+                )
+            }
         }
         this is IOException -> GeminiError.Offline
         else -> GeminiError.Unexpected(message ?: "Something went wrong talking to Gemini.")
     }
+
+    /**
+     * Google's error bodies explain retirements and quota problems far better than the
+     * status code does, so surface that text when it is there.
+     */
+    @OptIn(ExperimentalStdlibApi::class)
+    private fun HttpException.serverErrorMessage(): String? = runCatching {
+        val body = response()?.errorBody()?.string().orEmpty()
+        moshi.adapter<ApiErrorEnvelope>().fromJson(body)?.error?.message?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     companion object {
         const val ROLE_USER = "user"

@@ -7,7 +7,12 @@ package com.example.calcalc.ai
  */
 object MealPrompt {
 
-    const val MODEL = "gemini-2.5-flash"
+    /**
+     * Google retires older models for new API keys without warning — 2.5-flash now answers
+     * 404 for keys created after its cutoff. If this starts 404-ing, the error surfaced in
+     * chat carries Google's own replacement suggestion.
+     */
+    const val MODEL = "gemini-3.6-flash"
 
     val SYSTEM_INSTRUCTION = """
         You are a nutrition estimator inside a calorie-tracking app. The user describes or
