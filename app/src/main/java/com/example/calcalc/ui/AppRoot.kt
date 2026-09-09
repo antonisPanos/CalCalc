@@ -1,6 +1,7 @@
 package com.example.calcalc.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -147,7 +148,15 @@ private fun MainScaffold(session: SessionViewModel) {
             }
         }
     ) { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(innerPadding)) {
+        // Consume as well as apply: without this the chat's own Scaffold and the input
+        // bar's navigationBarsPadding re-add the same system-bar insets, stacking up to
+        // three times the intended gap at the bottom.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+        ) {
             NavDisplay(
                 backStack = backStack,
                 onBack = { backStack.removeLastOrNull() },
@@ -179,10 +188,11 @@ private fun MainScaffold(session: SessionViewModel) {
                             target = target,
                             onEditEntry = { id -> backStack.add(ChatKey(entryId = id)) },
                             onAddForDate = { date -> backStack.add(ChatKey(dateLocal = date.toString())) },
+                            onBack = { switchTo(HomeKey) },
                         )
                     }
-                    entry<WeightKey> { WeightScreen(session = session) }
-                    entry<ProfileKey> { ProfileScreen(session = session) }
+                    entry<WeightKey> { WeightScreen(session = session, onBack = { switchTo(HomeKey) }) }
+                    entry<ProfileKey> { ProfileScreen(session = session, onBack = { switchTo(HomeKey) }) }
                 },
             )
         }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -55,7 +56,7 @@ fun OnboardingScreen(
         else -> draft.goalValid
     }
 
-    Column(modifier.fillMaxSize().padding(24.dp)) {
+    Column(modifier.fillMaxSize().imePadding().padding(24.dp)) {
         LinearProgressIndicator(
             progress = { (step + 1) / (lastStep + 1f) },
             modifier = Modifier.fillMaxWidth(),

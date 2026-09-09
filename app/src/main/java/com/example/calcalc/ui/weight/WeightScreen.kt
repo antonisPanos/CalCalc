@@ -32,6 +32,7 @@ import com.example.calcalc.data.model.toLocalDateOrNull
 import com.example.calcalc.ui.ProfileState
 import com.example.calcalc.ui.SessionViewModel
 import com.example.calcalc.ui.components.DayValue
+import com.example.calcalc.ui.components.ScreenScaffold
 import com.example.calcalc.ui.components.DecimalField
 import com.example.calcalc.ui.components.WeightLineChart
 import com.example.calcalc.ui.profile.trimmed
@@ -43,6 +44,7 @@ private val DISPLAY_DATE = DateTimeFormatter.ofPattern("d MMM yyyy")
 @Composable
 fun WeightScreen(
     session: SessionViewModel,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WeightViewModel = viewModel(factory = WeightViewModel.Factory),
 ) {
@@ -70,65 +72,65 @@ fun WeightScreen(
         }
     }
 
-    Column(
-        modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("Weight", style = MaterialTheme.typography.headlineSmall)
-
-        val latest = logs.firstOrNull()?.weightKg
-        SummaryCard(latest = latest, goal = profile?.goalWeightKg, goalDate = target?.realisticGoalDate)
-
-        WeightLineChart(points = points, projection = projection)
-
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    ScreenScaffold(title = "Weight", onBack = onBack, modifier = modifier) {
+        Column(
+            Modifier.fillMaxSize().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            DecimalField(
-                label = "Today's weight",
-                value = input,
-                onValueChange = { input = it },
-                suffix = "kg",
-                modifier = Modifier.weight(1f),
-            )
-            Button(
-                enabled = input.toDoubleOrNull()?.let { it in 25.0..400.0 } == true,
-                onClick = {
-                    input.toDoubleOrNull()?.let { viewModel.log(it) }
-                    input = ""
-                },
-            ) { Text("Log") }
-        }
+            val latest = logs.firstOrNull()?.weightKg
+            SummaryCard(latest = latest, goal = profile?.goalWeightKg, goalDate = target?.realisticGoalDate)
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(logs, key = { it.dateLocal }) { log ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+            WeightLineChart(points = points, projection = projection)
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DecimalField(
+                    label = "Today's weight",
+                    value = input,
+                    onValueChange = { input = it },
+                    suffix = "kg",
+                    modifier = Modifier.weight(1f),
+                )
+                Button(
+                    enabled = input.toDoubleOrNull()?.let { it in 25.0..400.0 } == true,
+                    onClick = {
+                        input.toDoubleOrNull()?.let { viewModel.log(it) }
+                        input = ""
+                    },
+                ) { Text("Log") }
+            }
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(logs, key = { it.dateLocal }) { log ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(
-                            log.dateLocal.toLocalDateOrNull()?.format(DISPLAY_DATE) ?: log.dateLocal,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
-                                "${log.weightKg.trimmed()} kg",
+                                log.dateLocal.toLocalDateOrNull()?.format(DISPLAY_DATE) ?: log.dateLocal,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
                             )
-                            IconButton(onClick = { viewModel.delete(log.dateLocal) }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete ${log.dateLocal}",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "${log.weightKg.trimmed()} kg",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
+                                IconButton(onClick = { viewModel.delete(log.dateLocal) }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete ${log.dateLocal}",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }

@@ -40,6 +40,7 @@ import com.example.calcalc.data.model.Sex
 import com.example.calcalc.ui.ProfileState
 import com.example.calcalc.ui.SessionViewModel
 import com.example.calcalc.ui.components.CardChoice
+import com.example.calcalc.ui.components.ScreenScaffold
 import com.example.calcalc.ui.components.DateField
 import com.example.calcalc.ui.components.DecimalField
 import com.example.calcalc.ui.components.SegmentedChoice
@@ -49,6 +50,7 @@ import java.time.LocalDate
 @Composable
 fun ProfileScreen(
     session: SessionViewModel,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -60,109 +62,109 @@ fun ProfileScreen(
     var draft by remember(profile) { mutableStateOf(ProfileDraft.from(profile)) }
     var status by remember { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("Profile", style = MaterialTheme.typography.headlineSmall)
-
-        target?.let {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(14.dp)) {
-                    Text("Daily target ${it.target} kcal", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "BMR ${it.bmr} · burn ${it.tdee} · adjustment ${it.appliedDelta} kcal",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+    ScreenScaffold(title = "Profile", onBack = onBack, modifier = modifier) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            target?.let {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("Daily target ${it.target} kcal", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "BMR ${it.bmr} · burn ${it.tdee} · adjustment ${it.appliedDelta} kcal",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
-        }
 
-        SegmentedChoice(
-            options = listOf(Sex.MALE, Sex.FEMALE),
-            selected = draft.sex,
-            label = { it.label },
-            onSelect = { draft = draft.copy(sex = it) },
-        )
-        DateField(
-            label = "Date of birth",
-            date = draft.birthDate,
-            onDateChange = { draft = draft.copy(birthDate = it) },
-            yearRange = 1920..LocalDate.now().year,
-        )
-        DecimalField("Height", draft.heightCm, { draft = draft.copy(heightCm = it) }, "cm")
-        DecimalField(
-            label = "Starting weight",
-            value = draft.weightKg,
-            onValueChange = { draft = draft.copy(weightKg = it) },
-            suffix = "kg",
-        )
-        Text(
-            "Your current weight comes from the Weight tab; this is only the starting point.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Text("Typical day", style = MaterialTheme.typography.titleMedium)
-        CardChoice(
-            options = ActivityLevel.entries,
-            selected = draft.activityLevel,
-            title = { it.label },
-            detail = { it.detail },
-            onSelect = { draft = draft.copy(activityLevel = it) },
-        )
-
-        Text("Goal", style = MaterialTheme.typography.titleMedium)
-        SegmentedChoice(
-            options = listOf(Goal.MAINTAIN, Goal.LOSE, Goal.GAIN),
-            selected = draft.goal,
-            label = { it.label },
-            onSelect = { draft = draft.copy(goal = it) },
-        )
-        if (draft.goal != Goal.MAINTAIN) {
-            DecimalField("Target weight", draft.goalWeightKg, { draft = draft.copy(goalWeightKg = it) }, "kg")
-            DateField(
-                label = "Target date",
-                date = draft.goalDate,
-                onDateChange = { draft = draft.copy(goalDate = it) },
-                placeholder = "Optional",
-                yearRange = LocalDate.now().year..LocalDate.now().year + 10,
+            SegmentedChoice(
+                options = listOf(Sex.MALE, Sex.FEMALE),
+                selected = draft.sex,
+                label = { it.label },
+                onSelect = { draft = draft.copy(sex = it) },
             )
+            DateField(
+                label = "Date of birth",
+                date = draft.birthDate,
+                onDateChange = { draft = draft.copy(birthDate = it) },
+                yearRange = 1920..LocalDate.now().year,
+            )
+            DecimalField("Height", draft.heightCm, { draft = draft.copy(heightCm = it) }, "cm")
+            DecimalField(
+                label = "Starting weight",
+                value = draft.weightKg,
+                onValueChange = { draft = draft.copy(weightKg = it) },
+                suffix = "kg",
+            )
+            Text(
+                "Your current weight comes from the Weight tab; this is only the starting point.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Text("Typical day", style = MaterialTheme.typography.titleMedium)
+            CardChoice(
+                options = ActivityLevel.entries,
+                selected = draft.activityLevel,
+                title = { it.label },
+                detail = { it.detail },
+                onSelect = { draft = draft.copy(activityLevel = it) },
+            )
+
+            Text("Goal", style = MaterialTheme.typography.titleMedium)
+            SegmentedChoice(
+                options = listOf(Goal.MAINTAIN, Goal.LOSE, Goal.GAIN),
+                selected = draft.goal,
+                label = { it.label },
+                onSelect = { draft = draft.copy(goal = it) },
+            )
+            if (draft.goal != Goal.MAINTAIN) {
+                DecimalField("Target weight", draft.goalWeightKg, { draft = draft.copy(goalWeightKg = it) }, "kg")
+                DateField(
+                    label = "Target date",
+                    date = draft.goalDate,
+                    onDateChange = { draft = draft.copy(goalDate = it) },
+                    placeholder = "Optional",
+                    yearRange = LocalDate.now().year..LocalDate.now().year + 10,
+                )
+            }
+
+            Button(
+                enabled = draft.isValid,
+                onClick = {
+                    scope.launch {
+                        runCatching { ServiceLocator.userRepository().saveProfile(draft.toProfile(profile)) }
+                            .onSuccess { status = "Saved." }
+                            .onFailure { status = it.message ?: "Couldn't save." }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Save profile") }
+
+            status?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            ApiKeySection()
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            OutlinedButton(
+                onClick = { scope.launch { ServiceLocator.authRepository.signOut(context) } },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Sign out") }
         }
-
-        Button(
-            enabled = draft.isValid,
-            onClick = {
-                scope.launch {
-                    runCatching { ServiceLocator.userRepository().saveProfile(draft.toProfile(profile)) }
-                        .onSuccess { status = "Saved." }
-                        .onFailure { status = it.message ?: "Couldn't save." }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Save profile") }
-
-        status?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        ApiKeySection()
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        OutlinedButton(
-            onClick = { scope.launch { ServiceLocator.authRepository.signOut(context) } },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Sign out") }
     }
 }
 

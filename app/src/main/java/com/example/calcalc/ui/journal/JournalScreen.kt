@@ -37,6 +37,7 @@ import com.example.calcalc.domain.CalorieTarget
 import com.example.calcalc.ui.components.CalorieBar
 import com.example.calcalc.ui.components.CaloriesBarChart
 import com.example.calcalc.ui.components.DayValue
+import com.example.calcalc.ui.components.ScreenScaffold
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -48,6 +49,7 @@ fun JournalScreen(
     target: CalorieTarget?,
     onEditEntry: (String) -> Unit,
     onAddForDate: (LocalDate) -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: JournalViewModel = viewModel(factory = JournalViewModel.Factory),
 ) {
@@ -60,38 +62,38 @@ fun JournalScreen(
         days.reversed().map { DayValue(it.date, it.totalCalories.toFloat()) }
     }
 
-    Column(modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
-        Text("Journal", style = MaterialTheme.typography.headlineSmall)
-
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            JournalRange.entries.forEach { option ->
-                FilterChip(
-                    selected = option == range,
-                    onClick = { viewModel.setRange(option) },
-                    label = { Text(option.label) },
-                )
+    ScreenScaffold(title = "Journal", onBack = onBack, modifier = modifier) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                JournalRange.entries.forEach { option ->
+                    FilterChip(
+                        selected = option == range,
+                        onClick = { viewModel.setRange(option) },
+                        label = { Text(option.label) },
+                    )
+                }
             }
-        }
 
-        CaloriesBarChart(days = chartDays, target = target?.target ?: 0)
+            CaloriesBarChart(days = chartDays, target = target?.target ?: 0)
 
-        LazyColumn(
-            Modifier.fillMaxWidth().padding(top = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(days, key = { it.date.toString() }) { day ->
-                DayCard(
-                    day = day,
-                    target = target?.target ?: 0,
-                    expanded = expandedDate == day.date,
-                    onToggle = { expandedDate = if (expandedDate == day.date) null else day.date },
-                    onEditEntry = onEditEntry,
-                    onDeleteEntry = viewModel::deleteEntry,
-                    onAdd = { onAddForDate(day.date) },
-                )
+            LazyColumn(
+                Modifier.fillMaxWidth().padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(days, key = { it.date.toString() }) { day ->
+                    DayCard(
+                        day = day,
+                        target = target?.target ?: 0,
+                        expanded = expandedDate == day.date,
+                        onToggle = { expandedDate = if (expandedDate == day.date) null else day.date },
+                        onEditEntry = onEditEntry,
+                        onDeleteEntry = viewModel::deleteEntry,
+                        onAdd = { onAddForDate(day.date) },
+                    )
+                }
             }
         }
     }
