@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Themed-icon variant. The system tints by alpha, so the track is dropped: tinted to the
+  same colour as the progress arc it would fill the gap in and turn the gauge into a plain
+  circle. Absence is what keeps the arc readable here.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M54,29 A25,25 0 1 1 29,54"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="8"
+        android:strokeLineCap="round" />
+
+    <path
+        android:pathData="M54,54 L54,39"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,54 L65.2,60"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round" />
+
+    <path
+        android:pathData="M54,50.8 A3.2,3.2 0 1 1 54,57.2 A3.2,3.2 0 1 1 54,50.8"
+        android:fillColor="#FFFFFFFF" />
+</vector>
