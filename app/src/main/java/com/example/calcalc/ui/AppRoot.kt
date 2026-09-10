@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -35,11 +37,13 @@ import com.example.calcalc.ServiceLocator
 import com.example.calcalc.data.FirebaseConfig
 import com.example.calcalc.data.model.UserProfile
 import com.example.calcalc.nav.ChatKey
+import com.example.calcalc.nav.FastingKey
 import com.example.calcalc.nav.HomeKey
 import com.example.calcalc.nav.JournalKey
 import com.example.calcalc.nav.ProfileKey
 import com.example.calcalc.nav.WeightKey
 import com.example.calcalc.ui.chat.ChatScreen
+import com.example.calcalc.ui.fasting.FastingScreen
 import com.example.calcalc.ui.home.HomeScreen
 import com.example.calcalc.ui.journal.JournalScreen
 import com.example.calcalc.ui.onboarding.OnboardingScreen
@@ -110,9 +114,13 @@ private fun MainScaffold(session: SessionViewModel) {
     val target by session.target.collectAsStateWithLifecycle()
     val currentKey = backStack.lastOrNull()
 
+    // Five destinations, with logging in the middle because it is the one used daily.
+    // Home is not a tab: it is what Back and the screens' back arrows return to.
     val destinations = listOf(
         BottomDestination(ProfileKey, "Profile", Icons.Default.Person),
         BottomDestination(JournalKey, "Journal", Icons.AutoMirrored.Filled.ShowChart),
+        BottomDestination(ChatKey(), "Log", Icons.Default.Restaurant),
+        BottomDestination(FastingKey, "Fasting", Icons.Default.HourglassEmpty),
         BottomDestination(WeightKey, "Weight", Icons.Default.MonitorWeight),
     )
 
@@ -167,10 +175,9 @@ private fun MainScaffold(session: SessionViewModel) {
                 entryProvider = entryProvider {
                     entry<HomeKey> {
                         HomeScreen(
-                            target = target,
-                            onWriteItDown = { backStack.add(ChatKey()) },
-                            onTakePhoto = { backStack.add(ChatKey(openCamera = true)) },
+                            session = session,
                             onOpenEntry = { id -> backStack.add(ChatKey(entryId = id)) },
+                            onOpenFasting = { switchTo(FastingKey) },
                         )
                     }
                     entry<ChatKey> { chatKey ->
@@ -191,6 +198,7 @@ private fun MainScaffold(session: SessionViewModel) {
                             onBack = { switchTo(HomeKey) },
                         )
                     }
+                    entry<FastingKey> { FastingScreen(session = session, onBack = { switchTo(HomeKey) }) }
                     entry<WeightKey> { WeightScreen(session = session, onBack = { switchTo(HomeKey) }) }
                     entry<ProfileKey> { ProfileScreen(session = session, onBack = { switchTo(HomeKey) }) }
                 },

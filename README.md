@@ -11,7 +11,8 @@ Not a Play Store app — it is built for one person, signed in with one Google a
 - **Onboarding** asks for sex, date of birth, height, weight, how active your day actually
   is, and your weight goal, then computes a daily calorie budget (Mifflin-St Jeor BMR ×
   activity multiplier, adjusted toward the goal).
-- **Home** shows today's consumed-vs-target ring and two ways in: write it down, or photograph it.
+- **Home** is a read-only dashboard: today's consumed-vs-target ring, the target breakdown,
+  and fasting status. Logging is reached from the bottom bar, not from here.
 - **Chat** is where logging happens. The parsed items table stays pinned above the
   conversation; corrections like "make that three eggs" or "drop the fries" update it. Done
   saves the entry.
@@ -19,6 +20,14 @@ Not a Play Store app — it is built for one person, signed in with one Google a
   to reopen it in chat and edit it; add entries to past days.
 - **Weight** logs one weight per day, charts the trend, and projects when you reach your goal.
   The latest weight feeds back into the daily target.
+- **Fasting** runs in one of two modes. *Timer* starts a fast now for 8, 16 or 24 hours —
+  picked from clock faces whose arc shows the share of a day — or any custom length; the
+  countdown is derived from stored timestamps, so it survives the app being killed.
+  *Schedule* is a fixed daily window (say 20:00 → 12:00) that the app evaluates against the
+  wall clock, including across midnight.
+
+The bottom bar is Profile · Journal · Log · Fasting · Weight, with Home reached by the back
+arrow on each screen.
 
 Everything is dark mode only.
 
@@ -87,6 +96,12 @@ users/{uid}                        profile: sex, birthDate, heightCm, weightKg,
 users/{uid}/entries/{autoId}       dateLocal, createdAt, updatedAt, items[],
                                    totalCalories, source
 users/{uid}/weights/{yyyy-MM-dd}   weightKg, recordedAt
+users/{uid}/fasting/config         mode, dailyStartMinute, dailyEndMinute
+users/{uid}/fasting/active         startedAt, plannedEndAt (absent when not fasting)
+users/{uid}/fasts/{autoId}         startedAt, endedAt, plannedEndAt
 ```
+
+Daily fasting times are minutes from local midnight, not timestamps: "I stop eating at 8pm"
+is a wall-clock rule and must not drift with dates or timezones.
 
 The weight document id is the day, so re-weighing corrects rather than duplicates.

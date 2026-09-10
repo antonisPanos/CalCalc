@@ -25,4 +25,7 @@ data object JournalKey : NavKey
 data object WeightKey : NavKey
 
 @Serializable
+data object FastingKey : NavKey
+
+@Serializable
 data object ProfileKey : NavKey

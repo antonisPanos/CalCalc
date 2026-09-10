@@ -6,6 +6,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.calcalc.ServiceLocator
 import com.example.calcalc.data.UserDataRepository
+import com.example.calcalc.data.model.ActiveFast
+import com.example.calcalc.data.model.FastingConfig
 import com.example.calcalc.data.model.UserProfile
 import com.example.calcalc.domain.CalorieMath
 import com.example.calcalc.domain.CalorieTarget
@@ -46,6 +48,16 @@ class SessionViewModel(
         val effectiveWeight = weight ?: loaded.weightKg
         CalorieMath.dailyTarget(loaded, effectiveWeight)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    // Fasting config and the running fast live here rather than in the fasting screen: the
+    // home screen shows the same status, and one listener is enough for both.
+    val fastingConfig: StateFlow<FastingConfig> = repo.fastingConfigFlow()
+        .catch { emit(FastingConfig()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FastingConfig())
+
+    val activeFast: StateFlow<ActiveFast?> = repo.activeFastFlow()
+        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     companion object {
         val Factory = viewModelFactory {

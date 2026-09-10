@@ -1,6 +1,9 @@
 package com.example.calcalc.data
 
+import com.example.calcalc.data.model.ActiveFast
 import com.example.calcalc.data.model.EntrySource
+import com.example.calcalc.data.model.FastRecord
+import com.example.calcalc.data.model.FastingConfig
 import com.example.calcalc.data.model.FoodItem
 import com.example.calcalc.data.model.JournalEntry
 import com.example.calcalc.data.model.UserProfile
@@ -32,6 +35,8 @@ class UserDataRepository(
     private val userDoc: DocumentReference get() = db.collection("users").document(uid)
     private val entries: CollectionReference get() = userDoc.collection("entries")
     private val weights: CollectionReference get() = userDoc.collection("weights")
+    private val fasting: CollectionReference get() = userDoc.collection("fasting")
+    private val fasts: CollectionReference get() = userDoc.collection("fasts")
 
     // --- Profile ---
 
@@ -114,6 +119,68 @@ class UserDataRepository(
         weights.document(date.toString()).delete().await()
     }
 
+    // --- Fasting ---
+
+    fun fastingConfigFlow(): Flow<FastingConfig> =
+        fasting.document(CONFIG_DOC).snapshots().map { snapshot ->
+            snapshot.takeIf { it.exists() }
+                ?.let { runCatching { it.toObject(FastingConfig::class.java) }.getOrNull() }
+                ?: FastingConfig()
+        }
+
+    suspend fun saveFastingConfig(config: FastingConfig) {
+        fasting.document(CONFIG_DOC).set(config).await()
+    }
+
+    /** Emits null whenever no timer fast is running. */
+    fun activeFastFlow(): Flow<ActiveFast?> =
+        fasting.document(ACTIVE_DOC).snapshots().map { snapshot ->
+            snapshot.takeIf { it.exists() }
+                ?.let { runCatching { it.toObject(ActiveFast::class.java) }.getOrNull() }
+                ?.takeIf { it.isSet }
+        }
+
+    suspend fun startFast(startedAt: Long, plannedEndAt: Long) {
+        fasting.document(ACTIVE_DOC)
+            .set(ActiveFast(startedAt = startedAt, plannedEndAt = plannedEndAt))
+            .await()
+    }
+
+    /**
+     * Files the finished fast in history and clears the active doc. History is written
+     * first so a failure halfway leaves the fast still running rather than silently lost.
+     */
+    suspend fun endFast(active: ActiveFast, endedAt: Long = System.currentTimeMillis()) {
+        fasts.document().set(
+            FastRecord(
+                startedAt = active.startedAt,
+                endedAt = endedAt,
+                plannedEndAt = active.plannedEndAt,
+            )
+        ).await()
+        fasting.document(ACTIVE_DOC).delete().await()
+    }
+
+    /** Abandons the running fast without recording it. */
+    suspend fun cancelFast() {
+        fasting.document(ACTIVE_DOC).delete().await()
+    }
+
+    fun recentFasts(limit: Long = 30): Flow<List<FastRecord>> =
+        fasts.orderBy("endedAt", Query.Direction.DESCENDING)
+            .limit(limit)
+            .snapshots()
+            .map { snap ->
+                snap.documents.mapNotNull {
+                    runCatching { it.toObject(FastRecord::class.java) }.getOrNull()
+                }
+            }
+
     private fun com.google.firebase.firestore.QuerySnapshot.toEntries(): List<JournalEntry> =
         documents.mapNotNull { runCatching { it.toObject(JournalEntry::class.java) }.getOrNull() }
+
+    private companion object {
+        const val CONFIG_DOC = "config"
+        const val ACTIVE_DOC = "active"
+    }
 }

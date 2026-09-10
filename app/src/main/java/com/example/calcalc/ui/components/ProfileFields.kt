@@ -177,3 +177,55 @@ private fun rememberDatePickerStateFor(
     initialSelectedDateMillis = date?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
     yearRange = yearRange,
 )
+
+/** Wall-clock time input, stored as minutes from midnight. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimeField(
+    label: String,
+    minuteOfDay: Int,
+    onMinuteOfDayChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+
+    Card(
+        onClick = { showPicker = true },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(formatMinuteOfDay(minuteOfDay), color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+
+    if (showPicker) {
+        val state = androidx.compose.material3.rememberTimePickerState(
+            initialHour = minuteOfDay / 60,
+            initialMinute = minuteOfDay % 60,
+            is24Hour = true,
+        )
+        androidx.compose.material3.TimePickerDialog(
+            onDismissRequest = { showPicker = false },
+            title = { Text(label) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onMinuteOfDayChange(state.hour * 60 + state.minute)
+                    showPicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancel") } },
+        ) {
+            androidx.compose.material3.TimePicker(state = state)
+        }
+    }
+}
+
+fun formatMinuteOfDay(minuteOfDay: Int): String {
+    val normalised = ((minuteOfDay % (24 * 60)) + 24 * 60) % (24 * 60)
+    return "%02d:%02d".format(normalised / 60, normalised % 60)
+}

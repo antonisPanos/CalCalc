@@ -1,5 +1,7 @@
 package com.example.calcalc.ui.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,15 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,33 +23,53 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.calcalc.data.model.JournalEntry
 import com.example.calcalc.domain.CalorieTarget
+import com.example.calcalc.domain.FastingMath
+import com.example.calcalc.domain.FastingStatus
+import com.example.calcalc.ui.SessionViewModel
 import com.example.calcalc.ui.components.CalorieRing
+import com.example.calcalc.ui.components.rememberTickingNow
+import com.example.calcalc.ui.fasting.FastingStatusCard
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 private val DISPLAY_DATE = DateTimeFormatter.ofPattern("d MMM yyyy")
 
+/**
+ * The dashboard. Logging is reached from the bottom bar rather than from here, so this
+ * screen stays a read-only picture of the day: calories against target, fasting status,
+ * and what has been eaten so far.
+ */
 @Composable
 fun HomeScreen(
-    target: CalorieTarget?,
-    onWriteItDown: () -> Unit,
-    onTakePhoto: () -> Unit,
+    session: SessionViewModel,
     onOpenEntry: (String) -> Unit,
+    onOpenFasting: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val entries by viewModel.todayEntries.collectAsStateWithLifecycle()
+    val target by session.target.collectAsStateWithLifecycle()
+    val fastingConfig by session.fastingConfig.collectAsStateWithLifecycle()
+    val activeFast by session.activeFast.collectAsStateWithLifecycle()
+
+    // A minute is enough here; the fasting screen itself ticks every second.
+    val now by rememberTickingNow(periodMillis = 60_000L)
+    val fastingStatus = FastingMath.status(fastingConfig, activeFast, now)
+
     val consumed = entries.sumOf { it.totalCalories }
 
     Column(
         modifier
             .fillMaxSize()
+            // Opaque so the crossfade to another route does not show both screens at once.
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Text(
-            java.time.LocalDate.now().format(DISPLAY_DATE),
+            LocalDate.now().format(DISPLAY_DATE),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -62,18 +78,11 @@ fun HomeScreen(
 
         target?.let { TargetNote(it) }
 
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Button(onClick = onWriteItDown, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Outlined.Edit, contentDescription = null)
-                Text("  Write it down")
-            }
-            OutlinedButton(onClick = onTakePhoto, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Default.PhotoCamera, contentDescription = null)
-                Text("  Photo")
-            }
+        if (fastingStatus != FastingStatus.Disabled) {
+            FastingStatusCard(
+                status = fastingStatus,
+                modifier = Modifier.clickable(onClick = onOpenFasting),
+            )
         }
 
         if (entries.isNotEmpty()) {
