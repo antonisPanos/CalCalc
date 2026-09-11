@@ -168,6 +168,9 @@ private fun MainScaffold(session: SessionViewModel) {
             NavDisplay(
                 backStack = backStack,
                 onBack = { backStack.removeLastOrNull() },
+                transitionSpec = NavTransitions.push(),
+                popTransitionSpec = NavTransitions.pop(),
+                predictivePopTransitionSpec = NavTransitions.predictivePop(),
                 entryDecorators = listOf(
                     rememberSaveableStateHolderNavEntryDecorator(),
                     rememberViewModelStoreNavEntryDecorator(),
