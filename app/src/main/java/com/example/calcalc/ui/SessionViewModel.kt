@@ -11,14 +11,17 @@ import com.example.calcalc.data.model.FastingConfig
 import com.example.calcalc.data.model.UserProfile
 import com.example.calcalc.domain.CalorieMath
 import com.example.calcalc.domain.CalorieTarget
+import com.example.calcalc.notify.FastingScheduler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * Profile and derived calorie target for the signed-in user, held once at the root so every
@@ -26,6 +29,11 @@ import kotlinx.coroutines.flow.stateIn
  */
 class SessionViewModel(
     private val repo: UserDataRepository,
+    /**
+     * Called whenever the fasting settings change, to re-arm the reminder alarms. A lambda
+     * rather than a Context keeps this ViewModel free of Android dependencies.
+     */
+    private val onFastingChanged: (FastingConfig, ActiveFast?) -> Unit = { _, _ -> },
 ) : ViewModel() {
 
     /** null while loading, then either the profile or [UserProfile] absent. */
@@ -59,9 +67,26 @@ class SessionViewModel(
         .catch { emit(null) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    init {
+        // Alarms are absolute times held by the system, so they only need re-arming when the
+        // schedule itself changes — plus once at startup, which covers a reboot.
+        viewModelScope.launch {
+            combine(fastingConfig, activeFast) { config, active -> config to active }
+                .distinctUntilChanged()
+                .collect { (config, active) -> onFastingChanged(config, active) }
+        }
+    }
+
     companion object {
         val Factory = viewModelFactory {
-            initializer { SessionViewModel(ServiceLocator.userRepository()) }
+            initializer {
+                SessionViewModel(
+                    repo = ServiceLocator.userRepository(),
+                    onFastingChanged = { config, active ->
+                        FastingScheduler.sync(ServiceLocator.applicationContext, config, active)
+                    },
+                )
+            }
         }
     }
 }

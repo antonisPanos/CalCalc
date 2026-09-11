@@ -12,19 +12,23 @@ Not a Play Store app — it is built for one person, signed in with one Google a
   is, and your weight goal, then computes a daily calorie budget (Mifflin-St Jeor BMR ×
   activity multiplier, adjusted toward the goal).
 - **Home** is a read-only dashboard: today's consumed-vs-target ring, the target breakdown,
-  and fasting status. Logging is reached from the bottom bar, not from here.
+  fasting status, and — once anything has been logged — a short read on how the day is
+  going. Logging is reached from the bottom bar, not from here.
 - **Chat** is where logging happens. The parsed items table stays pinned above the
   conversation; corrections like "make that three eggs" or "drop the fries" update it. Done
-  saves the entry.
+  saves the entry. Message text is selectable. A failed send is retried once silently — a
+  503 from Gemini is common and usually transient — and only then shows a retry icon.
 - **Journal** groups entries by day with a calories chart against your target. Tap an entry
-  to reopen it in chat and edit it; add entries to past days.
+  to reopen it in chat and edit it; add entries to past days. The ↺ to the left of an entry
+  copies that meal onto today, since breakfast tends to repeat.
 - **Weight** logs one weight per day, charts the trend, and projects when you reach your goal.
   The latest weight feeds back into the daily target.
 - **Fasting** runs in one of two modes. *Timer* starts a fast now for 8, 16 or 24 hours —
   picked from clock faces whose arc shows the share of a day — or any custom length; the
   countdown is derived from stored timestamps, so it survives the app being killed.
   *Schedule* is a fixed daily window (say 20:00 → 12:00) that the app evaluates against the
-  wall clock, including across midnight.
+  wall clock, including across midnight. Either mode posts a notification 15 minutes before
+  a fast starts and before it ends.
 
 The bottom bar is Profile · Journal · Log · Fasting · Weight, with Home reached by the back
 arrow on each screen.
@@ -41,6 +45,7 @@ Everything is dark mode only.
 | AI | Gemini REST (`gemini-3.6-flash`) via Retrofit/Moshi, with a `responseSchema` forcing structured JSON |
 | Camera | CameraX in-app capture, plus the system photo picker |
 | API key | Encrypted with an Android Keystore AES-GCM key, stored in DataStore |
+| Reminders | AlarmManager + a broadcast receiver, with the schedule mirrored to SharedPreferences |
 
 Two deliberate departures from the original notes:
 
@@ -105,3 +110,28 @@ Daily fasting times are minutes from local midnight, not timestamps: "I stop eat
 is a wall-clock rule and must not drift with dates or timezones.
 
 The weight document id is the day, so re-weighing corrects rather than duplicates.
+
+## Notifications
+
+Fasting reminders are the only thing that needs the notification permission, so it is asked
+for on the Fasting screen, and only once a mode is switched on.
+
+Alarms outlive the process, so the fasting settings are mirrored into SharedPreferences: a
+receiver waking at 19:45, or after a reboot, has to know the schedule without signing in to
+Firestore first. Each firing arms the next one.
+
+Exact alarms need a permission Android will not grant on its own; without it the reminders
+fall back to `setAndAllowWhileIdle`, which the system may delay by a few minutes. That is
+fine for a fifteen-minute warning. To make them exact, grant "Alarms & reminders" in the
+app's system settings.
+
+## Day insight
+
+`domain/NutritionInsight.kt` is what Home shows under the entries. It is time-aware on
+purpose: every line is judged against the share of the day's budget a normal eating pattern
+would have used by that hour, and shortfalls stay quiet until mid-afternoon. A
+breakfast-only morning should not be told it is missing dinner.
+
+Macro advice is skipped entirely unless most of the day's calories carry that macro — Gemini
+leaves them null when it cannot estimate, and totalling only the items that have numbers
+would understate the day.

@@ -25,8 +25,17 @@ sealed class GeminiError(message: String) : Exception(message) {
     object InvalidKey : GeminiError("That Gemini API key was rejected. Check it in Profile.")
     object RateLimited : GeminiError("Gemini is rate-limiting or out of quota. Try again shortly.")
     object Offline : GeminiError("No connection. The message wasn't sent.")
+
+    /** A 5xx from Google — 503 "overloaded" is common and usually clears on a second try. */
+    class ServerError(val code: Int) : GeminiError("Gemini is having trouble (HTTP $code).")
     class Blocked(reason: String) : GeminiError("Gemini refused to answer ($reason).")
     class Unexpected(detail: String) : GeminiError(detail)
+
+    /**
+     * Whether sending the exact same turn again might succeed. A rejected key or a blocked
+     * prompt will fail identically every time, so retrying those only wastes quota.
+     */
+    val isRetryable: Boolean get() = this is ServerError || this is Offline
 }
 
 class GeminiRepository(
@@ -102,7 +111,7 @@ class GeminiRepository(
                     serverMessage ?: "Gemini model ${MealPrompt.MODEL} is unavailable."
                 )
                 429 -> GeminiError.RateLimited
-                in 500..599 -> GeminiError.Unexpected("Gemini is having trouble (HTTP ${code()}).")
+                in 500..599 -> GeminiError.ServerError(code())
                 else -> GeminiError.Unexpected(
                     serverMessage ?: "Gemini call failed (HTTP ${code()})."
                 )

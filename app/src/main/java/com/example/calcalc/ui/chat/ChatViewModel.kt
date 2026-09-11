@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.calcalc.ServiceLocator
+import com.example.calcalc.ai.GeminiError
 import com.example.calcalc.ai.GeminiRepository
 import com.example.calcalc.ai.MealParse
 import com.example.calcalc.ai.ParsedItem
@@ -17,6 +18,7 @@ import com.example.calcalc.data.model.FoodItem
 import com.example.calcalc.nav.ChatKey
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapter
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,10 +29,15 @@ import java.time.LocalDate
 enum class ChatRole { USER, ASSISTANT, SYSTEM }
 
 data class ChatMessage(
+    val id: Long,
     val role: ChatRole,
     val text: String,
     /** Base64 JPEG shown as a thumbnail, for messages the user sent with a photo. */
     val imageBase64: String? = null,
+    /** Set on a user message that failed to send, even after the automatic retry. */
+    val failed: Boolean = false,
+    /** On a system message, the id of the user message whose failure it reports. */
+    val errorFor: Long? = null,
 )
 
 data class ChatUiState(
@@ -75,6 +82,11 @@ class ChatViewModel(
     /** What we replay to Gemini each turn: (role, turn). */
     private val history = mutableListOf<Pair<String, TurnInput>>()
 
+    /** Turns that have not landed yet, so a manual retry can resend the original. */
+    private val pendingTurns = mutableMapOf<Long, TurnInput>()
+
+    private var nextMessageId = 0L
+
     private var source = EntrySource.TEXT
 
     init {
@@ -89,7 +101,7 @@ class ChatViewModel(
                 _state.update {
                     it.copy(
                         loading = false,
-                        messages = it.messages + ChatMessage(ChatRole.SYSTEM, "Couldn't load that entry."),
+                        messages = it.messages + systemMessage("Couldn't load that entry."),
                     )
                 }
                 return@launch
@@ -104,9 +116,7 @@ class ChatViewModel(
                     entryId = entryId,
                     date = entry.date ?: it.date,
                     items = entry.items,
-                    messages = listOf(
-                        ChatMessage(ChatRole.SYSTEM, "Editing an entry from ${entry.dateLocal}.")
-                    ),
+                    messages = listOf(systemMessage("Editing an entry from ${entry.dateLocal}.")),
                 )
             }
         }
@@ -117,47 +127,96 @@ class ChatViewModel(
         if (imageBase64 != null) source = EntrySource.PHOTO
 
         val turn = TurnInput(text = text?.trim(), imageBase64 = imageBase64)
+        val messageId = nextMessageId++
+        pendingTurns[messageId] = turn
+
         _state.update {
             it.copy(
-                sending = true,
-                needsApiKey = false,
                 messages = it.messages + ChatMessage(
+                    id = messageId,
                     role = ChatRole.USER,
                     text = text?.trim().orEmpty(),
                     imageBase64 = imageBase64,
                 ),
             )
         }
+        dispatch(messageId, turn)
+    }
+
+    /** Re-sends a message the user tapped the retry icon on. */
+    fun retry(messageId: Long) {
+        val turn = pendingTurns[messageId] ?: return
+        _state.update { current ->
+            current.copy(
+                // Drop the stale error so the conversation doesn't collect one per attempt.
+                messages = current.messages
+                    .filterNot { it.errorFor == messageId }
+                    .map { if (it.id == messageId) it.copy(failed = false) else it },
+            )
+        }
+        dispatch(messageId, turn)
+    }
+
+    /**
+     * Sends one turn, retrying once without telling the user. Gemini answers 503
+     * ("overloaded") often enough that a single quiet retry removes most of the failures
+     * a person would otherwise have to tap through.
+     */
+    private fun dispatch(messageId: Long, turn: TurnInput) {
+        _state.update { it.copy(sending = true, needsApiKey = false) }
 
         viewModelScope.launch {
-            val result = gemini.sendTurn(history.toList(), turn)
+            var result = gemini.sendTurn(history.toList(), turn)
+            val firstError = result.exceptionOrNull()
+            if (firstError is GeminiError && firstError.isRetryable) {
+                delay(SILENT_RETRY_DELAY_MS)
+                result = gemini.sendTurn(history.toList(), turn)
+            }
+
             result.fold(
                 onSuccess = { parse ->
+                    pendingTurns.remove(messageId)
                     history += GeminiRepository.ROLE_USER to turn
                     history += GeminiRepository.ROLE_MODEL to TurnInput(text = encode(parse))
                     _state.update {
                         it.copy(
                             sending = false,
                             items = parse.items.map(ParsedItem::toFoodItem),
-                            messages = it.messages + ChatMessage(ChatRole.ASSISTANT, parse.reply),
+                            messages = it.messages + ChatMessage(
+                                id = nextMessageId++,
+                                role = ChatRole.ASSISTANT,
+                                text = parse.reply,
+                            ),
                         )
                     }
                 },
                 onFailure = { error ->
-                    _state.update {
-                        it.copy(
+                    // A missing key is fixed in Profile, not by sending the same thing again,
+                    // so that one case gets a link instead of a retry icon.
+                    val missingKey = error is GeminiError.MissingKey
+                    _state.update { current ->
+                        current.copy(
                             sending = false,
-                            needsApiKey = error is com.example.calcalc.ai.GeminiError.MissingKey,
-                            messages = it.messages + ChatMessage(
-                                ChatRole.SYSTEM,
-                                error.message ?: "Something went wrong.",
-                            ),
+                            needsApiKey = missingKey,
+                            messages = current.messages
+                                .map { if (it.id == messageId) it.copy(failed = !missingKey) else it } +
+                                systemMessage(
+                                    text = error.message ?: "Something went wrong.",
+                                    errorFor = messageId,
+                                ),
                         )
                     }
                 },
             )
         }
     }
+
+    private fun systemMessage(text: String, errorFor: Long? = null) = ChatMessage(
+        id = nextMessageId++,
+        role = ChatRole.SYSTEM,
+        text = text,
+        errorFor = errorFor,
+    )
 
     /** Removes a row directly, without spending a model round-trip on an obvious mistake. */
     fun removeItem(index: Int) {
@@ -180,9 +239,8 @@ class ChatViewModel(
                     _state.update {
                         it.copy(
                             saving = false,
-                            messages = it.messages + ChatMessage(
-                                ChatRole.SYSTEM,
-                                error.message ?: "Couldn't save this entry.",
+                            messages = it.messages + systemMessage(
+                                error.message ?: "Couldn't save this entry."
                             ),
                         )
                     }
@@ -211,6 +269,9 @@ class ChatViewModel(
     )
 
     companion object {
+        /** Long enough for a transient overload to clear, short enough to feel like one send. */
+        private const val SILENT_RETRY_DELAY_MS = 1_200L
+
         val ARGS_KEY = CreationExtras.Key<ChatKey>()
 
         fun factory(args: ChatKey) = viewModelFactory {

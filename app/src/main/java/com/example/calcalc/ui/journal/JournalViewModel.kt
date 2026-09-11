@@ -35,6 +35,10 @@ class JournalViewModel(private val repo: UserDataRepository) : ViewModel() {
     private val _range = MutableStateFlow(JournalRange.WEEK)
     val range: StateFlow<JournalRange> = _range.asStateFlow()
 
+    /** One-shot confirmation or failure text, shown as a snackbar. */
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
     private val entries: StateFlow<List<JournalEntry>> = repo.recentEntries()
         .catch { emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -55,6 +59,23 @@ class JournalViewModel(private val repo: UserDataRepository) : ViewModel() {
 
     fun deleteEntry(id: String) {
         viewModelScope.launch { runCatching { repo.deleteEntry(id) } }
+    }
+
+    /**
+     * Copies a past meal onto today as a brand-new entry. Breakfast tends to repeat, and
+     * re-describing it to the model would cost a round-trip to get the same numbers back.
+     */
+    fun repeatToday(entry: JournalEntry) {
+        if (entry.items.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { repo.saveEntry(null, LocalDate.now(), entry.items, entry.source) }
+                .onSuccess { _message.value = "Added ${entry.totalCalories} kcal to today." }
+                .onFailure { _message.value = it.message ?: "Couldn't copy that meal." }
+        }
+    }
+
+    fun clearMessage() {
+        _message.value = null
     }
 
     companion object {

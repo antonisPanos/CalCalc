@@ -3,6 +3,7 @@ package com.example.calcalc.ui.journal
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,9 +23,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.calcalc.data.model.JournalEntry
 import com.example.calcalc.domain.CalorieTarget
 import com.example.calcalc.ui.components.CalorieBar
 import com.example.calcalc.ui.components.CaloriesBarChart
@@ -55,7 +61,16 @@ fun JournalScreen(
 ) {
     val days by viewModel.days.collectAsStateWithLifecycle()
     val range by viewModel.range.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     var expandedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(message) {
+        message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessage()
+        }
+    }
 
     // The chart reads left-to-right in time; the list below reads newest first.
     val chartDays = remember(days) {
@@ -63,38 +78,42 @@ fun JournalScreen(
     }
 
     ScreenScaffold(title = "Journal", onBack = onBack, modifier = modifier) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                JournalRange.entries.forEach { option ->
-                    FilterChip(
-                        selected = option == range,
-                        onClick = { viewModel.setRange(option) },
-                        label = { Text(option.label) },
-                    )
+        Box(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    JournalRange.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == range,
+                            onClick = { viewModel.setRange(option) },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+
+                CaloriesBarChart(days = chartDays, target = target?.target ?: 0)
+
+                LazyColumn(
+                    Modifier.fillMaxWidth().padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(days, key = { it.date.toString() }) { day ->
+                        DayCard(
+                            day = day,
+                            target = target?.target ?: 0,
+                            expanded = expandedDate == day.date,
+                            onToggle = { expandedDate = if (expandedDate == day.date) null else day.date },
+                            onEditEntry = onEditEntry,
+                            onDeleteEntry = viewModel::deleteEntry,
+                            onRepeatEntry = viewModel::repeatToday,
+                            onAdd = { onAddForDate(day.date) },
+                        )
+                    }
                 }
             }
-
-            CaloriesBarChart(days = chartDays, target = target?.target ?: 0)
-
-            LazyColumn(
-                Modifier.fillMaxWidth().padding(top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(days, key = { it.date.toString() }) { day ->
-                    DayCard(
-                        day = day,
-                        target = target?.target ?: 0,
-                        expanded = expandedDate == day.date,
-                        onToggle = { expandedDate = if (expandedDate == day.date) null else day.date },
-                        onEditEntry = onEditEntry,
-                        onDeleteEntry = viewModel::deleteEntry,
-                        onAdd = { onAddForDate(day.date) },
-                    )
-                }
-            }
+            SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
         }
     }
 }
@@ -107,6 +126,7 @@ private fun DayCard(
     onToggle: () -> Unit,
     onEditEntry: (String) -> Unit,
     onDeleteEntry: (String) -> Unit,
+    onRepeatEntry: (JournalEntry) -> Unit,
     onAdd: () -> Unit,
 ) {
     Card(
@@ -151,6 +171,15 @@ private fun DayCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        // Same meals come round again; this copies one onto today without
+                        // going through the chat.
+                        IconButton(onClick = { onRepeatEntry(entry) }) {
+                            Icon(
+                                Icons.Default.Replay,
+                                contentDescription = "Log this meal again today",
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                         Column(
                             Modifier
                                 .weight(1f)

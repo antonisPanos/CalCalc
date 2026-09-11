@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,8 +24,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.calcalc.data.model.JournalEntry
 import com.example.calcalc.domain.CalorieTarget
+import com.example.calcalc.domain.DayInsight
 import com.example.calcalc.domain.FastingMath
 import com.example.calcalc.domain.FastingStatus
+import com.example.calcalc.domain.InsightTone
+import com.example.calcalc.domain.NutritionInsight
 import com.example.calcalc.ui.SessionViewModel
 import com.example.calcalc.ui.components.CalorieRing
 import com.example.calcalc.ui.components.rememberTickingNow
@@ -49,6 +53,7 @@ fun HomeScreen(
 ) {
     val entries by viewModel.todayEntries.collectAsStateWithLifecycle()
     val target by session.target.collectAsStateWithLifecycle()
+    val weightKg by session.currentWeightKg.collectAsStateWithLifecycle()
     val fastingConfig by session.fastingConfig.collectAsStateWithLifecycle()
     val activeFast by session.activeFast.collectAsStateWithLifecycle()
 
@@ -57,6 +62,17 @@ fun HomeScreen(
     val fastingStatus = FastingMath.status(fastingConfig, activeFast, now)
 
     val consumed = entries.sumOf { it.totalCalories }
+
+    // Recomputed on the hour rather than the minute: the wording only ever changes when the
+    // day moves into a new phase.
+    val insight = remember(entries, target, weightKg, now.hour) {
+        NutritionInsight.evaluate(
+            items = entries.flatMap { it.items },
+            targetKcal = target?.target ?: 0,
+            weightKg = weightKg,
+            time = now.toLocalTime(),
+        )
+    }
 
     Column(
         modifier
@@ -99,7 +115,54 @@ fun HomeScreen(
                 entries.forEach { entry -> EntryRow(entry) { onOpenEntry(entry.id) } }
             }
         }
+
+        insight?.let { InsightCard(it) }
     }
+}
+
+/**
+ * The day's nutrition read. Every line is phrased against how far through the day it is —
+ * a breakfast-only morning should not be told it is missing dinner.
+ */
+@Composable
+private fun InsightCard(insight: DayInsight) {
+    if (insight.lines.isEmpty()) return
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                "How today's going",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            insight.lines.forEach { line ->
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        "•  ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = line.tone.color(),
+                    )
+                    Text(
+                        line.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InsightTone.color() = when (this) {
+    InsightTone.GOOD -> MaterialTheme.colorScheme.primary
+    InsightTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
+    InsightTone.WARNING -> MaterialTheme.colorScheme.tertiary
 }
 
 @Composable

@@ -142,6 +142,24 @@ class GeminiRepositoryTest {
         assertTrue(result.exceptionOrNull() is GeminiError.Blocked)
     }
 
+    @Test
+    fun `a 503 is a retryable server error`() = runTest {
+        val result = repo { throw httpError(503) }.sendTurn(emptyList(), TurnInput("eggs"))
+
+        val error = result.exceptionOrNull()
+        assertTrue(error is GeminiError.ServerError)
+        assertEquals(503, (error as GeminiError.ServerError).code)
+        assertTrue(error.isRetryable)
+    }
+
+    @Test
+    fun `a rejected key is not retryable`() = runTest {
+        // Resending the same request with the same bad key would only burn another call.
+        val result = repo { throw httpError(401) }.sendTurn(emptyList(), TurnInput("eggs"))
+
+        assertTrue((result.exceptionOrNull() as GeminiError).isRetryable.not())
+    }
+
     private fun httpError(code: Int, body: String = "{}") = HttpException(
         Response.error<GeminiResponse>(code, body.toResponseBody("application/json".toMediaType()))
     )

@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.DisableSelection
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -136,22 +139,34 @@ fun ChatScreen(
                 onRemove = viewModel::removeItem,
             )
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(state.messages) { message -> MessageBubble(message, onOpenProfile, state.needsApiKey) }
-                if (state.sending) {
-                    item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Text(
-                                "  Reading your meal…",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+            // Wrapping the list, not each bubble, so a selection can span the reply and the
+            // message it answers — handy for copying an estimate out.
+            SelectionContainer(Modifier.weight(1f)) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(state.messages, key = { it.id }) { message ->
+                        MessageBubble(
+                            message = message,
+                            onOpenProfile = onOpenProfile,
+                            needsApiKey = state.needsApiKey,
+                            onRetry = { viewModel.retry(message.id) },
+                            retryEnabled = !state.sending,
+                        )
+                    }
+                    if (state.sending) {
+                        item {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Text(
+                                    "  Reading your meal…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
@@ -249,6 +264,8 @@ private fun MessageBubble(
     message: ChatMessage,
     onOpenProfile: () -> Unit,
     needsApiKey: Boolean,
+    onRetry: () -> Unit,
+    retryEnabled: Boolean,
 ) {
     val isUser = message.role == ChatRole.USER
     val isSystem = message.role == ChatRole.SYSTEM
@@ -264,9 +281,9 @@ private fun MessageBubble(
         else -> MaterialTheme.colorScheme.onSurface
     }
 
-    Row(
+    Column(
         Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
     ) {
         Column(
             Modifier
@@ -293,7 +310,23 @@ private fun MessageBubble(
                 Text(message.text, color = foreground, style = MaterialTheme.typography.bodyMedium)
             }
             if (isSystem && needsApiKey) {
-                TextButton(onClick = onOpenProfile) { Text("Open Profile") }
+                DisableSelection {
+                    TextButton(onClick = onOpenProfile) { Text("Open Profile") }
+                }
+            }
+        }
+
+        // The automatic retry has already been spent by the time this appears, so the icon
+        // means "try a third time", not "try again for the first time".
+        if (message.failed) {
+            DisableSelection {
+                IconButton(onClick = onRetry, enabled = retryEnabled) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Send again",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
     }

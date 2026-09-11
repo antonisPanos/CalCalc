@@ -19,6 +19,9 @@ object ServiceLocator {
         appContext = context.applicationContext
     }
 
+    /** Application context, for the few places that need one outside a composable. */
+    val applicationContext: Context get() = appContext
+
     val authRepository: AuthRepository by lazy { AuthRepository(appContext) }
 
     val apiKeyStore: ApiKeyStore by lazy { ApiKeyStore(appContext) }

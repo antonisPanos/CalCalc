@@ -1,5 +1,10 @@
 package com.example.calcalc.ui.fasting
 
+import android.Manifest
+import android.content.Intent
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,8 +28,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.calcalc.data.model.FastRecord
@@ -32,6 +39,8 @@ import com.example.calcalc.data.model.FastingMode
 import com.example.calcalc.domain.FastingMath
 import com.example.calcalc.domain.FastingStatus
 import com.example.calcalc.domain.toCompactString
+import com.example.calcalc.notify.FastingNotifications
+import com.example.calcalc.notify.FastingScheduler
 import com.example.calcalc.ui.SessionViewModel
 import com.example.calcalc.ui.components.DecimalField
 import com.example.calcalc.ui.components.FastDialRow
@@ -78,6 +87,8 @@ fun FastingScreen(
                 label = { it.label },
                 onSelect = { viewModel.setMode(config, it) },
             )
+
+            if (config.mode != FastingMode.OFF) NotificationPermissionCard()
 
             when (config.mode) {
                 FastingMode.OFF -> Text(
@@ -302,3 +313,60 @@ val FastingMode.label: String
         FastingMode.TIMER -> "Timer"
         FastingMode.DAILY -> "Schedule"
     }
+
+/**
+ * Reminders are the only reason this app needs the notification permission, so it is asked
+ * for here rather than at launch — and only once a fasting mode is actually switched on.
+ */
+@Composable
+private fun NotificationPermissionCard() {
+    val context = LocalContext.current
+    var granted by remember { mutableStateOf(FastingNotifications.hasPermission(context)) }
+    var denied by remember { mutableStateOf(false) }
+
+    // Coming back from the system settings screen is a resume, not a recomposition, so the
+    // state has to be re-read there or the card would linger after the user said yes.
+    LifecycleResumeEffect(Unit) {
+        granted = FastingNotifications.hasPermission(context)
+        onPauseOrDispose { }
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { allowed ->
+        granted = allowed
+        denied = !allowed
+    }
+
+    if (granted) return
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Reminders are off. CalCalc can nudge you ${FastingScheduler.LEAD_MINUTES} minutes " +
+                    "before a fast starts and before it ends.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (denied) {
+                // A second request is ignored once the user has refused, so send them to
+                // the only place that can still turn it on.
+                TextButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        )
+                    }
+                ) { Text("Open notification settings") }
+            } else {
+                TextButton(
+                    onClick = { launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                ) { Text("Turn reminders on") }
+            }
+        }
+    }
+}
