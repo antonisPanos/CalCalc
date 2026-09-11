@@ -37,9 +37,12 @@ object NavTransitions {
 
     /**
      * How far into a back gesture the leaving screen stays fully opaque. Fading from the
-     * first pixel of drag would make a half-finished, cancellable gesture look committed.
+     * first pixel of drag would make a half-finished, cancellable gesture look committed —
+     * but only just enough for that, because the screen should be gone well before the
+     * shrink finishes.
      */
-    private const val PREDICTIVE_FADE_DELAY_MS = 140
+    private const val PREDICTIVE_FADE_DELAY_MS = 50
+    private const val PREDICTIVE_FADE_MS = 150
     private const val PREDICTIVE_MS = 320
 
     /** Fraction of the width the leaving screen slides toward the gesture's edge. */
@@ -62,7 +65,9 @@ object NavTransitions {
         ContentTransform(
             targetContentEnter = fadeIn(tween(200, delayMillis = 40)) +
                 scaleIn(initialScale = 1.05f, animationSpec = tween(POP_MS, easing = Emphasized)),
-            initialContentExit = fadeOut(tween(180, easing = EmphasizedAccelerate)) +
+            // Out well before the scale finishes, so the shrink is uncovering the screen
+            // below rather than dragging a visible ghost along with it.
+            initialContentExit = fadeOut(tween(110, easing = EmphasizedAccelerate)) +
                 scaleOut(targetScale = 0.92f, animationSpec = tween(POP_MS, easing = Emphasized)),
             // Negative so the screen being dismissed stays on top and uncovers the one
             // beneath it, rather than being painted over.
@@ -90,7 +95,7 @@ object NavTransitions {
                 animationSpec = tween(PREDICTIVE_MS, easing = Emphasized),
             ) { width -> (width * PREDICTIVE_SLIDE * direction).roundToInt() } + fadeOut(
                 tween(
-                    durationMillis = PREDICTIVE_MS - PREDICTIVE_FADE_DELAY_MS,
+                    durationMillis = PREDICTIVE_FADE_MS,
                     delayMillis = PREDICTIVE_FADE_DELAY_MS,
                     easing = EmphasizedAccelerate,
                 )
