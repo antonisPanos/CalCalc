@@ -43,15 +43,21 @@ class JournalViewModel(private val repo: UserDataRepository) : ViewModel() {
         .catch { emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Kept current by the screen, since this ViewModel can outlive midnight. */
+    private val today = MutableStateFlow(LocalDate.now())
+
     /** Days newest first, including days with no entries so gaps are visible in the chart. */
-    val days: StateFlow<List<DaySummary>> = combine(entries, _range) { all, range ->
-        val today = LocalDate.now()
+    val days: StateFlow<List<DaySummary>> = combine(entries, _range, today) { all, range, today ->
         val byDate = all.groupBy { it.date }
         (0 until range.days).map { offset ->
             val date = today.minusDays(offset.toLong())
             DaySummary(date = date, entries = byDate[date].orEmpty().sortedBy { it.createdAt })
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setToday(date: LocalDate) {
+        today.value = date
+    }
 
     fun setRange(range: JournalRange) {
         _range.value = range

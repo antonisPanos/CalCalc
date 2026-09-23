@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.calcalc.data.model.FoodItem
 import com.example.calcalc.data.model.totalCalories
+import com.example.calcalc.ui.profile.trimmed
 
 /**
  * The always-visible table of what the model has parsed so far. Rows are removable directly
@@ -124,5 +125,4 @@ fun FoodItem.macroSummary(): String? {
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }
 
-private fun Double.trimZeros(): String =
-    if (this == toLong().toDouble()) "${toLong()}g" else "${"%.1f".format(this)}g"
+private fun Double.trimZeros(): String = "${trimmed()}g"

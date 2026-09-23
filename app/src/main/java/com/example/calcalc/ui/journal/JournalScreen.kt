@@ -44,6 +44,7 @@ import com.example.calcalc.ui.components.CalorieBar
 import com.example.calcalc.ui.components.CaloriesBarChart
 import com.example.calcalc.ui.components.DayValue
 import com.example.calcalc.ui.components.ScreenScaffold
+import com.example.calcalc.ui.components.rememberTickingNow
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -62,7 +63,9 @@ fun JournalScreen(
     val days by viewModel.days.collectAsStateWithLifecycle()
     val range by viewModel.range.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
-    var expandedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
+    val today = rememberTickingNow(periodMillis = 60_000L).value.toLocalDate()
+    LaunchedEffect(today) { viewModel.setToday(today) }
+    var expandedDate by remember(today) { mutableStateOf<LocalDate?>(today) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(message) {

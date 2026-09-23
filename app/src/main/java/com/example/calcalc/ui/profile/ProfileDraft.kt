@@ -4,6 +4,8 @@ import com.example.calcalc.data.model.ActivityLevel
 import com.example.calcalc.data.model.Goal
 import com.example.calcalc.data.model.Sex
 import com.example.calcalc.data.model.UserProfile
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 
 /**
@@ -62,7 +64,9 @@ data class ProfileDraft(
     }
 }
 
-fun Double.trimmed(): String = if (this == toLong().toDouble()) toLong().toString() else toString()
+/** At most two decimals, trailing zeros dropped: 72.0 → "72", 4.30000001 → "4.3". */
+fun Double.trimmed(): String =
+    BigDecimal.valueOf(this).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
 val Goal.label: String
     get() = when (this) {

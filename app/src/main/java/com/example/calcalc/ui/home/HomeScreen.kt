@@ -15,6 +15,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -33,7 +34,6 @@ import com.example.calcalc.ui.SessionViewModel
 import com.example.calcalc.ui.components.CalorieRing
 import com.example.calcalc.ui.components.rememberTickingNow
 import com.example.calcalc.ui.fasting.FastingStatusCard
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 private val DISPLAY_DATE = DateTimeFormatter.ofPattern("d MMM yyyy")
@@ -60,6 +60,8 @@ fun HomeScreen(
     // A minute is enough here; the fasting screen itself ticks every second.
     val now by rememberTickingNow(periodMillis = 60_000L)
     val fastingStatus = FastingMath.status(fastingConfig, activeFast, now)
+    val today = now.toLocalDate()
+    LaunchedEffect(today) { viewModel.setToday(today) }
 
     val consumed = entries.sumOf { it.totalCalories }
 
@@ -85,7 +87,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Text(
-            LocalDate.now().format(DISPLAY_DATE),
+            today.format(DISPLAY_DATE),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
