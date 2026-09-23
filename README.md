@@ -1,10 +1,29 @@
 # CalCalc
 
-A personal Android calorie tracker. You describe or photograph a meal, Gemini turns it into
-a table of food items with calorie estimates, you correct it in chat, and press Done to
-commit it to your journal.
+**Log a meal by describing it or snapping a photo. Gemini does the counting.**
 
-Not a Play Store app — it is built for one person, signed in with one Google account.
+![Android 15+](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF?logo=kotlin&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-Auth%20%2B%20Firestore-FFCA28?logo=firebase&logoColor=black)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
+CalCalc is a personal Android calorie tracker. Type "two eggs, toast with butter and a flat
+white" or take a picture of your plate, and Gemini turns it into a table of food items with
+calorie and macro estimates. Correct it in plain language ("make that three eggs", "drop the
+fries"), press **Done**, and it lands in your journal.
+
+Around that sits a daily calorie budget worked out from your profile and goal, a weight log
+that projects when you will reach your target, and an intermittent-fasting tracker with
+reminders.
+
+> CalCalc is a personal project, not a Play Store app. There is no shared backend: to run it
+> you bring your own Firebase project and Gemini API key (see [One-time setup](#one-time-setup)).
+> Calorie estimates come from an AI model and are approximate — this is not medical advice.
+
+**Contents:** [Features](#what-it-does) · [Architecture](#architecture) ·
+[Setup](#one-time-setup) · [Build](#build-and-run) · [Data layout](#data-layout) ·
+[License](#license)
 
 ## What it does
 
@@ -47,7 +66,7 @@ Everything is dark mode only.
 | API key | Encrypted with an Android Keystore AES-GCM key, stored in DataStore |
 | Reminders | AlarmManager + a broadcast receiver, with the schedule mirrored to SharedPreferences |
 
-Two deliberate departures from the original notes:
+Two deliberate design decisions:
 
 1. **Google Sign-In, not a username/password with a fake domain.** The requirement was "don't
    lose the data when I change phones or reinstall". A fake-domain account has no recovery
@@ -135,3 +154,7 @@ breakfast-only morning should not be told it is missing dinner.
 Macro advice is skipped entirely unless most of the day's calories carry that macro — Gemini
 leaves them null when it cannot estimate, and totalling only the items that have numbers
 would understate the day.
+
+## License
+
+Released under the [MIT License](LICENSE).
